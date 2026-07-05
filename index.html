@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fair Share 💸</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+    body { background: linear-gradient(135deg, #ffeef8 0%, #ffe0f0 100%); min-height: 100vh; padding: 20px; }
+   .container { max-width: 500px; margin: 0 auto; }
+    h1 { text-align: center; color: #d63384; margin-bottom: 5px; font-size: 2rem; }
+   .subtitle { text-align: center; color: #6c757d; margin-bottom: 25px; font-size: 0.9rem; }
+   .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 8px 25px rgba(214,51,132,0.15); margin-bottom: 20px; }
+    input { width: 100%; padding: 12px; border: 2px solid #ffd1dc; border-radius: 12px; margin-bottom: 10px; font-size: 1rem; }
+    input:focus { outline: none; border-color: #ff69b4; }
+    button { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; }
+   .btn-primary { background: #ff69b4; color: white; margin-bottom: 10px; }
+   .btn-primary:hover { background: #ff1493; transform: translateY(-2px); }
+   .btn-secondary { background: #ffe0f0; color: #d63384; }
+   .btn-danger { background: #ff6b6b; color: white; font-size: 0.8rem; padding: 6px 12px; width: auto; }
+   .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff5f9; border-radius: 12px; margin-bottom: 8px; }
+   .expense-name { font-weight: 600; color: #495057; }
+   .expense-amount { color: #d63384; font-weight: 700; }
+   .result-item { padding: 15px; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border-radius: 12px; margin-bottom: 10px; color: #155724; font-weight: 600; text-align: center; }
+   .empty { text-align: center; color: #adb5bd; padding: 20px; }
+   .flex { display: flex; gap: 10px; }
+   .flex input { margin-bottom: 0; }
+   .tag { display: inline-block; background: #ffe0f0; color: #d63384; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; margin-bottom: 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>💸 Fair Share</h1>
+    <p class="subtitle">Split expenses in 10 seconds | Day 10/20</p>
+
+    <div class="card">
+      <div class="tag">Step 1: Add Friends</div>
+      <div class="flex">
+        <input type="text" id="nameInput" placeholder="Friend name" />
+        <input type="number" id="amountInput" placeholder="₹ Paid" />
+      </div>
+      <button class="btn-primary" onclick="addExpense()">+ Add Expense</button>
+    </div>
+
+    <div class="card">
+      <div class="tag">Step 2: Expenses</div>
+      <div id="expenseList"></div>
+    </div>
+
+    <div class="card">
+      <div class="tag">Step 3: Who Pays Whom</div>
+      <button class="btn-primary" onclick="calculate()">✨ Calculate Split</button>
+      <div id="result" style="margin-top: 15px;"></div>
+      <button class="btn-secondary" onclick="shareWhatsApp()" id="shareBtn" style="display:none; margin-top:10px;">📱 Share on WhatsApp</button>
+      <button class="btn-secondary" onclick="resetAll()" style="margin-top:10px;">🔄 Reset All</button>
+    </div>
+  </div>
+
+<script>
+let expenses = JSON.parse(localStorage.getItem('fairShare')) || [];
+
+function saveData() {
+  localStorage.setItem('fairShare', JSON.stringify(expenses));
+  renderExpenses();
+}
+
+function addExpense() {
+  const name = nameInput.value.trim();
+  const amount = parseFloat(amountInput.value);
+
+  if(!name || isNaN(amount) || amount < 0) {
+    alert('Please enter valid name and amount 😊');
+    return;
+  }
+
+  const existing = expenses.find(e => e.name.toLowerCase() === name.toLowerCase());
+  if(existing) {
+    existing.paid += amount;
+  } else {
+    expenses.push({ name, paid: amount });
+  }
+
+  nameInput.value = '';
+  amountInput.value = '';
+  saveData();
+}
+
+function deleteExpense(index) {
+  expenses.splice(index, 1);
+  saveData();
+}
+
+function renderExpenses() {
+  if(expenses.length === 0) {
+    expenseList.innerHTML = '<div class="empty">No expenses yet. Add your first one! 👆</div>';
+    return;
+  }
+
+  expenseList.innerHTML = expenses.map((e, i) => `
+    <div class="expense-item">
+      <div>
+        <div class="expense-name">${e.name}</div>
+        <div class="expense-amount">₹${e.paid}</div>
+      </div>
+      <button class="btn-danger" onclick="deleteExpense(${i})">Delete</button>
+    </div>
+  `).join('');
+
+  const total = expenses.reduce((s,e) => s + e.paid, 0);
+  expenseList.innerHTML += `<div style="text-align:center; margin-top:15px; color:#6c757d; font-weight:600;">Total: ₹${total} | Per person: ₹${(total/expenses.length).toFixed(2)}</div>`;
+}
+
+function calculate() {
+  if(expenses.length < 2) {
+    result.innerHTML = '<div class="empty">Add at least 2 people to calculate 😊</div>';
+    shareBtn.style.display = 'none';
+    return;
+  }
+
+  const total = expenses.reduce((s,e) => s + e.paid, 0);
+  const avg = total / expenses.length;
+
+  let lenders = [], borrowers = [];
+  expenses.forEach(e => {
+    const diff = parseFloat((e.paid - avg).toFixed(2));
+    if(diff > 0) lenders.push({...e, diff});
+    else if(diff < 0) borrowers.push({...e, diff: -diff});
+  });
+
+  lenders.sort((a,b) => b.diff - a.diff);
+  borrowers.sort((a,b) => b.diff - a.diff);
+
+  let settlements = [];
+  let i = 0, j = 0;
+
+  while(i < lenders.length && j < borrowers.length) {
+    const pay = Math.min(lenders[i].diff, borrowers[j].diff);
+    settlements.push(`${borrowers[j].name} pays ${lenders[i].name} ₹${pay.toFixed(2)}`);
+    lenders[i].diff = parseFloat((lenders[i].diff - pay).toFixed(2));
+    borrowers[j].diff = parseFloat((borrowers[j].diff - pay).toFixed(2));
+    if(lenders[i].diff === 0) i++;
+    if(borrowers[j].diff === 0) j++;
+  }
+
+  if(settlements.length === 0) {
+    result.innerHTML = '<div class="result-item">🎉 All settled! Everyone paid equally</div>';
+    shareBtn.style.display = 'none';
+  } else {
+    result.innerHTML = settlements.map(s => `<div class="result-item">${s}</div>`).join('');
+    shareBtn.style.display = 'block';
+  }
+}
+
+function shareWhatsApp() {
+  const text = document.getElementById('result').innerText;
+  const msg = `💸 Fair Share Split:\n\n${text}\n\nCalculated using Fair Share 💖\n${window.location.href}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function resetAll() {
+  if(confirm('Clear all expenses?')) {
+    expenses = [];
+    saveData();
+    result.innerHTML = '';
+    shareBtn.style.display = 'none';
+  }
+}
+
+// Load on start
+renderExpenses();
+</script>
+</body>
+</html>
